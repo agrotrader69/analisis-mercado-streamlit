@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
-from bs4 import BeautifulSoup
 
 # Configuración general
 st.set_page_config(page_title="Análisis de Mercado Profesional", layout="wide")
@@ -27,39 +26,21 @@ def obtener_hist(ticker, periodo="6mo"):
         return None
 
 # ============================================================
-# BLOQUE — PUT/CALL REAL DESDE CBOE (SCRAPING)
+# BLOQUE — PUT/CALL REAL DESDE CBOE (API JSON)
 # ============================================================
 st.header("⚖️ Ratio Put–Call (Real desde CBOE)")
 
-def obtener_putcall_cboe():
-    url = "https://www.cboe.com/us/options/market_statistics/pc_ratio/"
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    table = soup.find("table")
-    if table is None:
-        raise Exception("No se encontró la tabla en CBOE.")
-
-    rows = table.find_all("tr")
+def obtener_putcall_cboe_json():
+    url = "https://cdn.cboe.com/api/global/delayed_quotes/options/pc_ratio.json"
+    r = requests.get(url)
+    data = r.json()
 
     fechas = []
     valores = []
 
-    for row in rows[1:]:
-        cols = row.find_all("td")
-        if len(cols) < 2:
-            continue
-
-        fecha = cols[0].text.strip()
-        valor = cols[1].text.strip()
-
-        try:
-            valor_float = float(valor)
-        except:
-            continue
-
-        fechas.append(fecha)
-        valores.append(valor_float)
+    for item in data["data"]:
+        fechas.append(item["date"])
+        valores.append(float(item["pc_ratio"]))
 
     df = pd.DataFrame({"Fecha": fechas, "PutCall": valores})
     df["Fecha"] = pd.to_datetime(df["Fecha"])
@@ -68,11 +49,10 @@ def obtener_putcall_cboe():
     return df
 
 try:
-    df_pc = obtener_putcall_cboe()
+    df_pc = obtener_putcall_cboe_json()
     ultimo_pc = df_pc["PutCall"].iloc[-1]
 
     st.metric("Put–Call Ratio (CBOE)", f"{ultimo_pc:.2f}")
-
     st.line_chart(df_pc.set_index("Fecha")["PutCall"])
 
     if ultimo_pc > 1.2:
@@ -102,7 +82,7 @@ with col2:
     st.metric("Nasdaq", f"{nasdaq:.2f}")
 
 with col3:
-    eurostoxx = obtener_precicio("^STOXX50E")
+    eurostoxx = obtener_precio("^STOXX50E")
     st.metric("EuroStoxx 50", f"{eurostoxx:.2f}")
 
 col4, col5, col6 = st.columns(3)

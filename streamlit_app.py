@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import requests
 
 # Configuración general
 st.set_page_config(page_title="Análisis de Mercado Profesional", layout="wide")
@@ -26,33 +25,24 @@ def obtener_hist(ticker, periodo="6mo"):
         return None
 
 # ============================================================
-# BLOQUE — PUT/CALL REAL DESDE CBOE (API JSON)
+# BLOQUE — RATIO PUT–CALL (vía yfinance)
 # ============================================================
-st.header("⚖️ Ratio Put–Call (Real desde CBOE)")
+st.header("⚖️ Ratio Put–Call (proxy CBOE)")
 
-def obtener_putcall_cboe_json():
-    url = "https://cdn.cboe.com/api/global/delayed_quotes/options/pc_ratio.json"
-    r = requests.get(url)
-    data = r.json()
+def obtener_putcall_yf():
+    try:
+        data = yf.Ticker("^PCR").history(period="6mo")
+        data = data.reset_index()
+        data.rename(columns={"Date": "Fecha", "Close": "PutCall"}, inplace=True)
+        return data
+    except:
+        return None
 
-    fechas = []
-    valores = []
+df_pc = obtener_putcall_yf()
 
-    for item in data["data"]:
-        fechas.append(item["date"])
-        valores.append(float(item["pc_ratio"]))
-
-    df = pd.DataFrame({"Fecha": fechas, "PutCall": valores})
-    df["Fecha"] = pd.to_datetime(df["Fecha"])
-    df = df.sort_values("Fecha")
-
-    return df
-
-try:
-    df_pc = obtener_putcall_cboe_json()
+if df_pc is not None and not df_pc.empty:
     ultimo_pc = df_pc["PutCall"].iloc[-1]
-
-    st.metric("Put–Call Ratio (CBOE)", f"{ultimo_pc:.2f}")
+    st.metric("Put–Call Ratio", f"{ultimo_pc:.2f}")
     st.line_chart(df_pc.set_index("Fecha")["PutCall"])
 
     if ultimo_pc > 1.2:
@@ -61,10 +51,9 @@ try:
         st.write("🟢 Sentimiento alcista (muchos calls)")
     else:
         st.write("🟡 Sentimiento neutral")
-
-except Exception as e:
-    st.write("⚠️ No se pudo obtener el Put–Call real desde CBOE.")
-    st.write(e)
+else:
+    ultimo_pc = None
+    st.write("⚠️ No se pudo obtener el ratio put–call.")
 
 # ============================================================
 # BLOQUE 1 — INDICADORES REALES DEL MERCADO
@@ -198,31 +187,4 @@ else:
 if curva < 0:
     resumen.append("🔴 La curva de tipos está invertida, señal clásica de recesión.")
 else:
-    resumen.append("🟢 La curva de tipos es normal, entorno más saludable.")
-
-# Liquidez global
-if liquidez_global < 1:
-    resumen.append("🔴 La liquidez global es baja, riesgo de caídas.")
-elif liquidez_global < 2:
-    resumen.append("🟡 La liquidez global es moderada.")
-else:
-    resumen.append("🟢 La liquidez global es alta, soporte para subidas.")
-
-# Riesgo sistémico
-if riesgo_sistemico >= 3:
-    resumen.append("🔴 El riesgo sistémico es elevado, precaución.")
-elif riesgo_sistemico == 2:
-    resumen.append("🟡 El riesgo sistémico es moderado.")
-else:
-    resumen.append("🟢 El riesgo sistémico es bajo.")
-
-# Put–call
-if ultimo_pc > 1.2:
-    resumen.append("🔴 El ratio put–call indica miedo en el mercado.")
-elif ultimo_pc < 0.8:
-    resumen.append("🟢 El ratio put–call indica optimismo.")
-else:
-    resumen.append("🟡 El ratio put–call indica neutralidad.")
-
-for r in resumen:
-    st.write(r)
+    resumen.append("🟢 La curva de tipos es normal

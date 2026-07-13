@@ -187,4 +187,34 @@ else:
 if curva < 0:
     resumen.append("🔴 La curva de tipos está invertida, señal clásica de recesión.")
 else:
-    resumen.append("🟢 La curva de tipos es normal
+    resumen.append("🟢 La curva de tipos es normal, entorno más saludable.")
+
+# Liquidez global
+if liquidez_global < 1:
+    resumen.append("🔴 La liquidez global es baja, riesgo de caídas.")
+elif liquidez_global < 2:
+    resumen.append("🟡 La liquidez global es moderada.")
+else:
+    resumen.append("🟢 La liquidez global es alta, soporte para subidas.")
+
+# Riesgo sistémico
+if riesgo_sistemico >= 3:
+    resumen.append("🔴 El riesgo sistémico es elevado, precaución.")
+elif riesgo_sistemico == 2:
+    resumen.append("🟡 El riesgo sistémico es moderado.")
+else:
+    resumen.append("🟢 El riesgo sistémico es bajo.")
+
+# Put–call
+if ultimo_pc is not None:
+    if ultimo_pc > 1.2:
+        resumen.append("🔴 El ratio put–call indica miedo en el mercado.")
+    elif ultimo_pc < 0.8:
+        resumen.append("🟢 El ratio put–call indica optimismo.")
+    else:
+        resumen.append("🟡 El ratio put–call indica neutralidad.")
+else:
+    resumen.append("⚠️ No se pudo obtener el ratio put–call.")
+
+for r in resumen:
+    st.write(r)

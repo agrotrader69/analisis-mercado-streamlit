@@ -20,7 +20,10 @@ def obtener_precio(ticker):
 
 def obtener_hist(ticker, periodo="6mo"):
     try:
-        return yf.Ticker(ticker).history(period=periodo)
+        data = yf.Ticker(ticker).history(period=periodo)
+        if data is None or data.empty:
+            return None
+        return data
     except:
         return None
 
@@ -34,7 +37,7 @@ mostrar_sentimiento = st.sidebar.checkbox("Mostrar panel de sentimiento", value=
 mostrar_tendencias = st.sidebar.checkbox("Mostrar panel de tendencias", value=False)
 mostrar_alertas = st.sidebar.checkbox("Mostrar alertas automáticas", value=True)
 
-activo_selector = st.sidebar.text_input("Seleccionar activo (ej: SPY, QQQ, AAPL)", "SPY")
+activo_selector = st.sidebar.text_input("Buscar activo (ej: SPY, QQQ, AAPL)", "SPY")
 
 # ============================================================
 # BLOQUE — RATIO PUT–CALL (vía yfinance)
@@ -77,22 +80,18 @@ st.header("📡 Indicadores en Tiempo Real")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    sp500 = obtener_precio("^GSPC")
-    st.metric("S&P 500", sp500)
+    st.metric("S&P 500", obtener_precio("^GSPC"))
 
 with col2:
-    nasdaq = obtener_precio("^IXIC")
-    st.metric("Nasdaq", nasdaq)
+    st.metric("Nasdaq", obtener_precio("^IXIC"))
 
 with col3:
-    eurostoxx = obtener_precio("^STOXX50E")
-    st.metric("EuroStoxx 50", eurostoxx)
+    st.metric("EuroStoxx 50", obtener_precio("^STOXX50E"))
 
 col4, col5, col6 = st.columns(3)
 
 with col4:
-    nikkei = obtener_precio("^N225")
-    st.metric("Nikkei 225", nikkei)
+    st.metric("Nikkei 225", obtener_precio("^N225"))
 
 with col5:
     vix = obtener_precio("^VIX")
@@ -103,19 +102,25 @@ with col6:
     st.metric("High Yield (HYG)", hyg)
 
 # ============================================================
-# BLOQUE 2 — CURVA DE TIPOS REAL
+# BLOQUE 2 — CURVA DE TIPOS (PROXY 10y–5y)
 # ============================================================
-st.header("📉 Curva de Tipos USA (Real)")
+st.header("📉 Curva de Tipos USA (Proxy 10y–5y)")
 
-bono_2y = obtener_precio("^IRX")
-bono_10y = obtener_precio("^TNX") / 10 if obtener_precio("^TNX") else None
+bono_10y_raw = obtener_precio("^TNX")
+bono_5y_raw = obtener_precio("^FVX")
 
-curva = bono_10y - bono_2y if bono_10y and bono_2y else None
-
-st.metric("Pendiente 10y - 2y", f"{curva:.2f}%" if curva else "N/A")
+if bono_10y_raw is not None and bono_5y_raw is not None:
+    bono_10y = bono_10y_raw / 10.0
+    bono_5y = bono_5y_raw / 10.0
+    curva = bono_10y - bono_5y
+    st.metric("Pendiente 10y - 5y (proxy)", f"{curva:.2f}%")
+else:
+    curva = None
+    st.metric("Pendiente 10y - 5y (proxy)", "N/A")
+    st.write("⚠️ No se pudo obtener la curva de tipos (proxy).")
 
 # ============================================================
-# BLOQUE 3 — ETFs (incluye UCITS)
+# BLOQUE 3 — ETFs Globales
 # ============================================================
 st.header("📊 ETFs Globales y UCITS")
 
@@ -142,7 +147,7 @@ with colF:
     st.metric("TLT (Bonos Largo Plazo)", obtener_precio("TLT"))
 
 # ============================================================
-# BLOQUE 4 — LIQUIDEZ GLOBAL (PROXY PROFESIONAL)
+# BLOQUE 4 — LIQUIDEZ GLOBAL
 # ============================================================
 st.header("🌍 Liquidez Global (Proxy)")
 
@@ -154,7 +159,7 @@ else:
 st.metric("Índice de Liquidez Global (proxy)", f"{liquidez_global:.2f}" if liquidez_global else "N/A")
 
 # ============================================================
-# BLOQUE 5 — RIESGO SISTÉMICO (PROXY PROFESIONAL)
+# BLOQUE 5 — RIESGO SISTÉMICO
 # ============================================================
 st.header("⚠️ Riesgo Sistémico (Proxy)")
 
@@ -169,7 +174,7 @@ if hyg and hyg < 80:
 st.metric("Índice de Riesgo Sistémico (proxy)", f"{riesgo_sistemico:.2f}")
 
 # ============================================================
-# BLOQUE 6 — ESCENARIOS PROBABILÍSTICOS
+# BLOQUE 6 — ESCENARIOS
 # ============================================================
 st.header("📊 Escenarios Probabilísticos Automáticos")
 
@@ -185,7 +190,7 @@ st.subheader(f"Probabilidad de Recesión: {prob_recesion}%")
 st.subheader(f"Probabilidad de Expansión: {prob_expansion}%")
 
 # ============================================================
-# BLOQUE 7 — PANEL DE SENTIMIENTO (OPCIONAL)
+# BLOQUE 7 — PANEL DE SENTIMIENTO
 # ============================================================
 if mostrar_sentimiento:
     st.header("💬 Panel de Sentimiento del Mercado")
@@ -203,13 +208,13 @@ if mostrar_sentimiento:
         st.write("🟢 Volatilidad contenida")
 
 # ============================================================
-# BLOQUE 8 — PANEL DE TENDENCIAS (OPCIONAL)
+# BLOQUE 8 — PANEL DE TENDENCIAS
 # ============================================================
 if mostrar_tendencias:
     st.header("📈 Panel de Tendencias")
 
     hist = obtener_hist(activo_selector, "6mo")
-    if hist is not None and not hist.empty:
+    if hist is not None:
         hist["MA20"] = hist["Close"].rolling(20).mean()
         hist["MA50"] = hist["Close"].rolling(50).mean()
 
@@ -219,13 +224,13 @@ if mostrar_tendencias:
         st.write("⚠️ No se pudo obtener el histórico del activo.")
 
 # ============================================================
-# BLOQUE 9 — ALERTAS AUTOMÁTICAS (OPCIONAL)
+# BLOQUE 9 — ALERTAS AUTOMÁTICAS
 # ============================================================
 if mostrar_alertas:
     st.header("🚨 Alertas Automáticas")
 
     if curva and curva < 0:
-        st.write("🔴 Alerta: Curva invertida (riesgo de recesión).")
+        st.write("🟠 Aviso: Pendiente 10y–5y negativa (proxy). Interpretar con cautela.")
 
     if vix and vix > 20:
         st.write("🔴 Alerta: Volatilidad elevada.")
@@ -246,9 +251,11 @@ else:
     resumen.append("🟢 La volatilidad es baja.")
 
 if curva and curva < 0:
-    resumen.append("🔴 La curva de tipos está invertida.")
+    resumen.append("🟠 La pendiente 10y–5y (proxy) es negativa. Señal a vigilar.")
+elif curva:
+    resumen.append("🟢 La pendiente 10y–5y (proxy) es positiva.")
 else:
-    resumen.append("🟢 La curva de tipos es normal.")
+    resumen.append("⚠️ Curva de tipos no disponible.")
 
 if liquidez_global and liquidez_global < 1:
     resumen.append("🔴 La liquidez global es baja.")

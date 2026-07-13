@@ -70,7 +70,29 @@ curva = bono_10y - bono_2y
 st.metric("Pendiente 10y - 2y", f"{curva:.2f}%")
 
 # ============================================================
-# BLOQUE 3 — ETFs (incluye UCITS)
+# BLOQUE 3 — RATIO PUT–CALL (REAL)
+# ============================================================
+st.header("⚖️ Ratio Put–Call (Real)")
+
+# CBOE Put/Call Ratio → Ticker: ^PCR
+put_call = obtener_precio("^PCR")
+
+if put_call:
+    st.metric("Put–Call Ratio", f"{put_call:.2f}")
+else:
+    st.write("⚠️ No se pudo obtener el ratio put–call en este momento.")
+
+# Interpretación profesional
+if put_call:
+    if put_call > 1.2:
+        st.write("🔴 Sentimiento bajista (muchos puts)")
+    elif put_call < 0.8:
+        st.write("🟢 Sentimiento alcista (muchos calls)")
+    else:
+        st.write("🟡 Sentimiento neutral")
+
+# ============================================================
+# BLOQUE 4 — ETFs (incluye UCITS)
 # ============================================================
 st.header("📊 ETFs Globales y UCITS")
 
@@ -97,14 +119,9 @@ with colF:
     st.metric("TLT (Bonos Largo Plazo)", f"{obtener_precio('TLT'):.2f}")
 
 # ============================================================
-# BLOQUE 4 — LIQUIDEZ GLOBAL (PROXY PROFESIONAL)
+# BLOQUE 5 — LIQUIDEZ GLOBAL (PROXY PROFESIONAL)
 # ============================================================
 st.header("🌍 Liquidez Global (Proxy)")
-
-# Proxies profesionales:
-# - Balance FED → SPY
-# - Liquidez crédito → HYG
-# - Liquidez mercado → VIX inverso
 
 liquidez_global = (obtener_precio("SPY") / vix) * (hyg / 100)
 
@@ -118,14 +135,9 @@ else:
     st.write("🟢 Liquidez global alta")
 
 # ============================================================
-# BLOQUE 5 — RIESGO SISTÉMICO (PROXY PROFESIONAL)
+# BLOQUE 6 — RIESGO SISTÉMICO (PROXY PROFESIONAL)
 # ============================================================
 st.header("⚠️ Riesgo Sistémico (Proxy)")
-
-# Proxies profesionales:
-# - Volatilidad → VIX
-# - Crédito → HYG
-# - Curva invertida → curva
 
 riesgo_sistemico = (vix / 20) + (1 if curva < 0 else 0) + (1 if hyg < 80 else 0)
 
@@ -139,7 +151,7 @@ else:
     st.write("🟢 Riesgo sistémico bajo")
 
 # ============================================================
-# BLOQUE 6 — ESCENARIOS PROBABILÍSTICOS
+# BLOQUE 7 — ESCENARIOS PROBABILÍSTICOS
 # ============================================================
 st.header("📊 Escenarios Probabilísticos Automáticos")
 
@@ -150,7 +162,7 @@ st.subheader(f"Probabilidad de Recesión: {prob_recesion}%")
 st.subheader(f"Probabilidad de Expansión: {prob_expansion}%")
 
 # ============================================================
-# BLOQUE 7 — PANEL DE RESUMEN AUTOMÁTICO
+# BLOQUE 8 — PANEL DE RESUMEN AUTOMÁTICO
 # ============================================================
 st.header("🧾 Resumen Automático del Mercado")
 
@@ -164,33 +176,4 @@ else:
 
 # Curva de tipos
 if curva < 0:
-    resumen.append("🔴 La curva de tipos está invertida, señal clásica de recesión.")
-else:
-    resumen.append("🟢 La curva de tipos es normal, entorno más saludable.")
-
-# Liquidez global
-if liquidez_global < 1:
-    resumen.append("🔴 La liquidez global es baja, riesgo de caídas.")
-elif liquidez_global < 2:
-    resumen.append("🟡 La liquidez global es moderada.")
-else:
-    resumen.append("🟢 La liquidez global es alta, soporte para subidas.")
-
-# Riesgo sistémico
-if riesgo_sistemico >= 3:
-    resumen.append("🔴 El riesgo sistémico es elevado, precaución.")
-elif riesgo_sistemico == 2:
-    resumen.append("🟡 El riesgo sistémico es moderado.")
-else:
-    resumen.append("🟢 El riesgo sistémico es bajo.")
-
-for r in resumen:
-    st.write(r)
-
-# ============================================================
-# BLOQUE 8 — GRÁFICO AVANZADO
-# ============================================================
-st.header("📈 Gráfico del S&P 500 (últimos 6 meses)")
-
-sp500_hist = obtener_hist("^GSPC", "6mo")
-st.line_chart(sp500_hist["Close"])
+    resumen.append("

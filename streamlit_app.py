@@ -3,13 +3,15 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
-# Configuración general
+# ============================================================
+# CONFIGURACIÓN GENERAL
+# ============================================================
 st.set_page_config(page_title="Análisis de Mercado Profesional", layout="wide")
 st.title("📈 Panel Profesional de Análisis de Mercado")
 st.write("Panel profesional con indicadores, liquidez, riesgo sistémico, sentimiento y escenarios.")
 
 # ============================================================
-# FUNCIÓN GENERAL PARA OBTENER DATOS
+# FUNCIONES DE DATOS
 # ============================================================
 def obtener_precio(ticker):
     try:
@@ -37,10 +39,10 @@ mostrar_sentimiento = st.sidebar.checkbox("Mostrar panel de sentimiento", value=
 mostrar_tendencias = st.sidebar.checkbox("Mostrar panel de tendencias", value=False)
 mostrar_alertas = st.sidebar.checkbox("Mostrar alertas automáticas", value=True)
 
-activo_selector = st.sidebar.text_input("Buscar activo (ej: SPY, QQQ, AAPL)", "SPY")
+activo_selector = st.sidebar.text_input("Buscar activo (ej: SPY, QQQ, AAPL)", "SPY").upper()
 
 # ============================================================
-# BLOQUE — RATIO PUT–CALL (vía yfinance)
+# RATIO PUT–CALL
 # ============================================================
 st.header("⚖️ Ratio Put–Call (proxy CBOE)")
 
@@ -73,7 +75,7 @@ else:
     st.write("⚠️ No se pudo obtener el ratio put–call.")
 
 # ============================================================
-# BLOQUE 1 — INDICADORES REALES DEL MERCADO
+# INDICADORES REALES DEL MERCADO
 # ============================================================
 st.header("📡 Indicadores en Tiempo Real")
 
@@ -102,7 +104,7 @@ with col6:
     st.metric("High Yield (HYG)", hyg)
 
 # ============================================================
-# BLOQUE 2 — CURVA DE TIPOS (PROXY 10y–5y)
+# CURVA DE TIPOS (PROXY 10y–5y)
 # ============================================================
 st.header("📉 Curva de Tipos USA (Proxy 10y–5y)")
 
@@ -120,7 +122,7 @@ else:
     st.write("⚠️ No se pudo obtener la curva de tipos (proxy).")
 
 # ============================================================
-# BLOQUE 3 — ETFs Globales
+# ETFs GLOBALes
 # ============================================================
 st.header("📊 ETFs Globales y UCITS")
 
@@ -147,7 +149,7 @@ with colF:
     st.metric("TLT (Bonos Largo Plazo)", obtener_precio("TLT"))
 
 # ============================================================
-# BLOQUE 4 — LIQUIDEZ GLOBAL
+# LIQUIDEZ GLOBAL
 # ============================================================
 st.header("🌍 Liquidez Global (Proxy)")
 
@@ -159,7 +161,7 @@ else:
 st.metric("Índice de Liquidez Global (proxy)", f"{liquidez_global:.2f}" if liquidez_global else "N/A")
 
 # ============================================================
-# BLOQUE 5 — RIESGO SISTÉMICO
+# RIESGO SISTÉMICO
 # ============================================================
 st.header("⚠️ Riesgo Sistémico (Proxy)")
 
@@ -174,7 +176,7 @@ if hyg and hyg < 80:
 st.metric("Índice de Riesgo Sistémico (proxy)", f"{riesgo_sistemico:.2f}")
 
 # ============================================================
-# BLOQUE 6 — ESCENARIOS
+# ESCENARIOS
 # ============================================================
 st.header("📊 Escenarios Probabilísticos Automáticos")
 
@@ -190,7 +192,7 @@ st.subheader(f"Probabilidad de Recesión: {prob_recesion}%")
 st.subheader(f"Probabilidad de Expansión: {prob_expansion}%")
 
 # ============================================================
-# BLOQUE 7 — PANEL DE SENTIMIENTO
+# PANEL DE SENTIMIENTO
 # ============================================================
 if mostrar_sentimiento:
     st.header("💬 Panel de Sentimiento del Mercado")
@@ -208,23 +210,42 @@ if mostrar_sentimiento:
         st.write("🟢 Volatilidad contenida")
 
 # ============================================================
-# BLOQUE 8 — PANEL DE TENDENCIAS
+# PANEL DE TENDENCIAS (CORREGIDO)
 # ============================================================
 if mostrar_tendencias:
-    st.header("📈 Panel de Tendencias")
+    st.header("📈 Panel de Tendencias del Activo")
 
-    hist = obtener_hist(activo_selector, "6mo")
-    if hist is not None:
+    ticker = activo_selector.strip().upper()
+
+    precio_activo = obtener_precio(ticker)
+    if precio_activo:
+        st.metric(f"Precio actual de {ticker}", f"{precio_activo:.2f}")
+    else:
+        st.write(f"⚠️ No se pudo obtener el precio de {ticker}. Verifica el símbolo.")
+
+    hist = obtener_hist(ticker, "6mo")
+
+    if hist is not None and not hist.empty:
         hist["MA20"] = hist["Close"].rolling(20).mean()
         hist["MA50"] = hist["Close"].rolling(50).mean()
 
         if mostrar_graficos:
             st.line_chart(hist[["Close", "MA20", "MA50"]])
+
+        ma20 = hist["MA20"].iloc[-1]
+        ma50 = hist["MA50"].iloc[-1]
+
+        if ma20 > ma50:
+            st.write(f"🟢 Tendencia alcista en {ticker} (MA20 > MA50).")
+        elif ma20 < ma50:
+            st.write(f"🔴 Tendencia bajista en {ticker} (MA20 < MA50).")
+        else:
+            st.write(f"🟡 Tendencia neutral en {ticker}.")
     else:
-        st.write("⚠️ No se pudo obtener el histórico del activo.")
+        st.write(f"⚠️ No se pudo obtener el histórico de {ticker}.")
 
 # ============================================================
-# BLOQUE 9 — ALERTAS AUTOMÁTICAS
+# ALERTAS AUTOMÁTICAS
 # ============================================================
 if mostrar_alertas:
     st.header("🚨 Alertas Automáticas")
@@ -239,7 +260,7 @@ if mostrar_alertas:
         st.write("🔴 Alerta: Liquidez global baja.")
 
 # ============================================================
-# BLOQUE 10 — RESUMEN AUTOMÁTICO
+# RESUMEN AUTOMÁTICO
 # ============================================================
 st.header("🧾 Resumen Automático del Mercado")
 

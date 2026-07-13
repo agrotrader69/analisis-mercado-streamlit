@@ -2,6 +2,8 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import requests
+from bs4 import BeautifulSoup
 
 # Configuración general
 st.set_page_config(page_title="Análisis de Mercado Profesional", layout="wide")
@@ -25,6 +27,66 @@ def obtener_hist(ticker, periodo="6mo"):
         return None
 
 # ============================================================
+# BLOQUE — PUT/CALL REAL DESDE CBOE (SCRAPING)
+# ============================================================
+st.header("⚖️ Ratio Put–Call (Real desde CBOE)")
+
+def obtener_putcall_cboe():
+    url = "https://www.cboe.com/us/options/market_statistics/pc_ratio/"
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    table = soup.find("table")
+    if table is None:
+        raise Exception("No se encontró la tabla en CBOE.")
+
+    rows = table.find_all("tr")
+
+    fechas = []
+    valores = []
+
+    for row in rows[1:]:
+        cols = row.find_all("td")
+        if len(cols) < 2:
+            continue
+
+        fecha = cols[0].text.strip()
+        valor = cols[1].text.strip()
+
+        try:
+            valor_float = float(valor)
+        except:
+            continue
+
+        fechas.append(fecha)
+        valores.append(valor_float)
+
+    df = pd.DataFrame({"Fecha": fechas, "PutCall": valores})
+    df["Fecha"] = pd.to_datetime(df["Fecha"])
+    df = df.sort_values("Fecha")
+
+    return df
+
+try:
+    df_pc = obtener_putcall_cboe()
+    ultimo_pc = df_pc["PutCall"].iloc[-1]
+
+    st.metric("Put–Call Ratio (CBOE)", f"{ultimo_pc:.2f}")
+
+    st.line_chart(df_pc.set_index("Fecha")["PutCall"])
+
+    if ultimo_pc > 1.2:
+        st.write("🔴 Sentimiento bajista (muchos puts)")
+    elif ultimo_pc < 0.8:
+        st.write("🟢 Sentimiento alcista (muchos calls)")
+    else:
+        st.write("🟡 Sentimiento neutral")
+
+except Exception as e:
+    st.write("⚠️ No se pudo obtener el Put–Call real desde CBOE.")
+    st.write(e)
+
+# ============================================================
 # BLOQUE 1 — INDICADORES REALES DEL MERCADO
 # ============================================================
 st.header("📡 Indicadores en Tiempo Real")
@@ -40,7 +102,7 @@ with col2:
     st.metric("Nasdaq", f"{nasdaq:.2f}")
 
 with col3:
-    eurostoxx = obtener_precio("^STOXX50E")
+    eurostoxx = obtener_precicio("^STOXX50E")
     st.metric("EuroStoxx 50", f"{eurostoxx:.2f}")
 
 col4, col5, col6 = st.columns(3)
@@ -70,27 +132,7 @@ curva = bono_10y - bono_2y
 st.metric("Pendiente 10y - 2y", f"{curva:.2f}%")
 
 # ============================================================
-# BLOQUE 3 — RATIO PUT–CALL (REAL)
-# ============================================================
-st.header("⚖️ Ratio Put–Call (Real)")
-
-put_call = obtener_precio("^PCR")
-
-if put_call:
-    st.metric("Put–Call Ratio", f"{put_call:.2f}")
-else:
-    st.write("⚠️ No se pudo obtener el ratio put–call en este momento.")
-
-if put_call:
-    if put_call > 1.2:
-        st.write("🔴 Sentimiento bajista (muchos puts)")
-    elif put_call < 0.8:
-        st.write("🟢 Sentimiento alcista (muchos calls)")
-    else:
-        st.write("🟡 Sentimiento neutral")
-
-# ============================================================
-# BLOQUE 4 — ETFs (incluye UCITS)
+# BLOQUE 3 — ETFs (incluye UCITS)
 # ============================================================
 st.header("📊 ETFs Globales y UCITS")
 
@@ -117,7 +159,7 @@ with colF:
     st.metric("TLT (Bonos Largo Plazo)", f"{obtener_precio('TLT'):.2f}")
 
 # ============================================================
-# BLOQUE 5 — LIQUIDEZ GLOBAL (PROXY PROFESIONAL)
+# BLOQUE 4 — LIQUIDEZ GLOBAL (PROXY PROFESIONAL)
 # ============================================================
 st.header("🌍 Liquidez Global (Proxy)")
 
@@ -133,7 +175,7 @@ else:
     st.write("🟢 Liquidez global alta")
 
 # ============================================================
-# BLOQUE 6 — RIESGO SISTÉMICO (PROXY PROFESIONAL)
+# BLOQUE 5 — RIESGO SISTÉMICO (PROXY PROFESIONAL)
 # ============================================================
 st.header("⚠️ Riesgo Sistémico (Proxy)")
 
@@ -149,7 +191,7 @@ else:
     st.write("🟢 Riesgo sistémico bajo")
 
 # ============================================================
-# BLOQUE 7 — ESCENARIOS PROBABILÍSTICOS
+# BLOQUE 6 — ESCENARIOS PROBABILÍSTICOS
 # ============================================================
 st.header("📊 Escenarios Probabilísticos Automáticos")
 
@@ -160,7 +202,7 @@ st.subheader(f"Probabilidad de Recesión: {prob_recesion}%")
 st.subheader(f"Probabilidad de Expansión: {prob_expansion}%")
 
 # ============================================================
-# BLOQUE 8 — PANEL DE RESUMEN AUTOMÁTICO
+# BLOQUE 7 — PANEL DE RESUMEN AUTOMÁTICO
 # ============================================================
 st.header("🧾 Resumen Automático del Mercado")
 
@@ -195,13 +237,12 @@ else:
     resumen.append("🟢 El riesgo sistémico es bajo.")
 
 # Put–call
-if put_call:
-    if put_call > 1.2:
-        resumen.append("🔴 El ratio put–call indica miedo en el mercado.")
-    elif put_call < 0.8:
-        resumen.append("🟢 El ratio put–call indica optimismo.")
-    else:
-        resumen.append("🟡 El ratio put–call indica neutralidad.")
+if ultimo_pc > 1.2:
+    resumen.append("🔴 El ratio put–call indica miedo en el mercado.")
+elif ultimo_pc < 0.8:
+    resumen.append("🟢 El ratio put–call indica optimismo.")
+else:
+    resumen.append("🟡 El ratio put–call indica neutralidad.")
 
 for r in resumen:
     st.write(r)
